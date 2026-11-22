@@ -1,0 +1,19 @@
+#!/bin/bash
+# Launch Parashara's Light 9 under Wine.
+export WINEPREFIX="${WINEPREFIX:-$HOME/.local/share/wineprefixes/pl9}"
+export WINEDEBUG="${WINEDEBUG:--all}"
+here="$(dirname "$(readlink -f "$0")")"
+app="$WINEPREFIX/drive_c/GeoVision/PL9"
+
+# Wine upgrades rewrite the prefix's DLLs, so re-apply the fix every start (no-op when already done).
+"$here/fix-wine-bss.py" "$WINEPREFIX/drive_c/windows/syswow64/user32.dll"
+
+# App-local hid.dll with a working HidD_FlushQueue; rebuild whenever Wine's copy changes.
+winehid=/usr/lib/wine/i386-windows/hid.dll
+if [ ! -e "$app/hid.dll" ] || [ "$winehid" -nt "$app/hid.dll" ]; then
+    "$here/make-hid-shim.py" "$winehid" "$app/hid.dll"
+fi
+export WINEDLLOVERRIDES="hid=n,b${WINEDLLOVERRIDES:+;$WINEDLLOVERRIDES}"
+
+cd "$app" || exit 1
+exec wine PL9.exe "$@"
